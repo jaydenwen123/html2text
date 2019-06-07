@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
-
 	"github.com/olekukonko/tablewriter"
 	"github.com/ssor/bom"
 	"golang.org/x/net/html"
@@ -147,10 +146,33 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 	ctx.justClosedDiv = false
 
 	switch node.DataAtom {
+
+	case atom.Code:
+		subCtx := textifyTraverseContext{}
+		if err := subCtx.traverseChildren(node); err != nil {
+			return err
+		}
+		str := subCtx.buf.String()
+		return ctx.emit("`"+str+"`")
+
 	case atom.Br:
 		return ctx.emit("\n")
-
-	case atom.H1, atom.H2, atom.H3:
+		//显示图片
+	case atom.Img:
+		alt:=getAttrVal(node,"alt")
+		link:=getAttrVal(node,"src")
+		if link==""{
+			link=getAttrVal(node,"data-src")
+		}
+		if link!=""{
+			link=ctx.normalizeHrefLink(link)
+			return ctx.emit("!["+alt+"]("+link+")")
+		}
+		return ctx.emit("!["+alt+"](图片格式不对)")
+	//
+	//以上是自己做的扩展
+	
+	case atom.H1, atom.H2, atom.H3,atom.H4,atom.H5,atom.H6:
 		subCtx := textifyTraverseContext{}
 		if err := subCtx.traverseChildren(node); err != nil {
 			return err
@@ -164,16 +186,28 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 			}
 		}
 		var divider string
+		var symbolLen int
 		if node.DataAtom == atom.H1 {
-			divider = strings.Repeat("*", dividerLen)
-		} else {
-			divider = strings.Repeat("-", dividerLen)
+			//divider = strings.Repeat("*", dividerLen)
+			symbolLen=1
+		} else if node.DataAtom== atom.H2{
+			symbolLen=2
+			//divider = strings.Repeat("-", dividerLen)
+		}else if node.DataAtom==atom.H3{
+			symbolLen=3
+		}else if node.DataAtom==atom.H4{
+			symbolLen=4
+		} else if node.DataAtom==atom.H5{
+			symbolLen=5
+		} else if node.DataAtom==atom.H6{
+			symbolLen=6
 		}
-
-		if node.DataAtom == atom.H3 {
-			return ctx.emit("\n\n" + str + "\n" + divider + "\n\n")
-		}
-		return ctx.emit("\n\n" + divider + "\n" + str + "\n" + divider + "\n\n")
+		divider=strings.Repeat("#",symbolLen)
+		return ctx.emit("\n\n"+divider+str+" "+divider+"\n\n")
+		//if node.DataAtom == atom.H3 {
+		//	return ctx.emit("\n\n" + str + "\n" + divider + "\n\n")
+		//}
+		//return ctx.emit("\n\n" + divider + "\n" + str + "\n" + divider + "\n\n")
 
 	case atom.Blockquote:
 		ctx.blockquoteLevel++
@@ -230,13 +264,16 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 			return err
 		}
 		str := subCtx.buf.String()
-		return ctx.emit("*" + str + "*")
+		return ctx.emit("**" + str + "**")
 
 	case atom.A:
 		linkText := ""
 		// For simple link element content with single text node only, peek at the link text.
-		if node.FirstChild != nil && node.FirstChild.NextSibling == nil && node.FirstChild.Type == html.TextNode {
-			linkText = node.FirstChild.Data
+		if node.FirstChild != nil && node.FirstChild.NextSibling == nil &&
+			(node.FirstChild.Type == html.TextNode)  {
+			linkText = "["+node.FirstChild.Data+"]"
+			node.FirstChild.Data=""
+			//fmt.Println(linkText)
 		}
 
 		// If image is the only child, take its alt text as the link text.
@@ -257,6 +294,7 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 			if !ctx.options.OmitLinks && attrVal != "" && linkText != attrVal {
 				hrefLink = "( " + attrVal + " )"
 			}
+			return ctx.emit(linkText+hrefLink)
 		}
 
 		return ctx.emit(hrefLink)
