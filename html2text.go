@@ -2,14 +2,14 @@ package html2text
 
 import (
 	"bytes"
-	"io"
-	"regexp"
-	"strings"
-	"unicode"
 	"github.com/olekukonko/tablewriter"
 	"github.com/ssor/bom"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
+	"io"
+	"regexp"
+	"strings"
+	"unicode"
 )
 
 // Options provide toggles and overrides to control specific rendering behaviors.
@@ -171,7 +171,7 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 		return ctx.emit("!["+alt+"](图片格式不对)")
 	//
 	//以上是自己做的扩展
-	
+
 	case atom.H1, atom.H2, atom.H3,atom.H4,atom.H5,atom.H6:
 		subCtx := textifyTraverseContext{}
 		if err := subCtx.traverseChildren(node); err != nil {
